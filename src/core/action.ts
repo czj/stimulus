@@ -64,7 +64,10 @@ export class Action {
       error(`contains unknown key filter: ${this.keyFilter}`)
     }
 
-    return this.keyMappings[standardFilter].toLowerCase() !== event.key.toLowerCase()
+    const mappedKey = this.keyMappings[standardFilter].toLowerCase()
+    const normalizedEventKey = this.normalizedKeyboardEventKey(event, mappedKey)
+
+    return mappedKey !== normalizedEventKey
   }
 
   shouldIgnoreMouseEvent(event: MouseEvent): boolean {
@@ -107,6 +110,17 @@ export class Action {
 
     return event.metaKey !== meta || event.ctrlKey !== ctrl || event.altKey !== alt || event.shiftKey !== shift
   }
+
+  private normalizedKeyboardEventKey(event: KeyboardEvent, mappedKey: string): string {
+    const eventKey = event.key.toLowerCase()
+
+    if (!shouldUseCodeFallback(event, mappedKey)) {
+      return eventKey
+    }
+
+    const keyFromCode = keyboardEventKeyFromCode(event.code)
+    return keyFromCode || eventKey
+  }
 }
 
 const defaultEventNames: { [tagName: string]: (element: Element) => string } = {
@@ -136,4 +150,26 @@ function typecast(value: any): any {
   } catch (o_O) {
     return value
   }
+}
+
+function shouldUseCodeFallback(event: KeyboardEvent, mappedKey: string): boolean {
+  return !event.isComposing && isPrintableASCIICharacter(mappedKey) && !isPrintableASCIICharacter(event.key)
+}
+
+function isPrintableASCIICharacter(value: string): boolean {
+  return value.length === 1 && value >= " " && value <= "~"
+}
+
+function keyboardEventKeyFromCode(code: string): string | null {
+  const keyMatch = code.match(/^Key([A-Z])$/)
+  if (keyMatch) {
+    return keyMatch[1].toLowerCase()
+  }
+
+  const digitMatch = code.match(/^Digit([0-9])$/)
+  if (digitMatch) {
+    return digitMatch[1]
+  }
+
+  return null
 }
