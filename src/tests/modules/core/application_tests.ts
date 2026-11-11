@@ -1,5 +1,6 @@
 import { ApplicationTestCase } from "../../cases/application_test_case"
 import { LogController } from "../../controllers/log_controller"
+import { OutletController } from "../../controllers/outlet_controller"
 
 class AController extends LogController {}
 class BController extends LogController {}
@@ -45,21 +46,20 @@ export default class ApplicationTests extends ApplicationTestCase {
     this.assert.ok(this.controllers[0] instanceof BController)
   }
 
-  "test connecting controllers does not list the contexts of every controller"() {
-    const router = this.application.router
-    const contexts = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(router), "contexts")!.get!
-    let contextsReads = 0
-    Object.defineProperty(router, "contexts", {
-      configurable: true,
-      get() {
-        contextsReads++
-        return contexts.call(this)
-      },
-    })
+  async "test registering a controller connects it as an outlet of the controllers declaring it"() {
+    await this.renderFixture(`
+      <div id="host" data-controller="host" data-host-beta-outlet=".beta"></div>
+      <div class="beta" data-controller="beta"></div>
+      <div class="beta" data-controller="beta"></div>
+    `)
 
-    this.application.load(this.definitions)
+    this.application.register("host", OutletController)
+    await this.nextFrame
+    this.application.register("beta", BController)
+    await this.nextFrame
 
-    this.assert.equal(contextsReads, 0)
+    const host = this.application.getControllerForElementAndIdentifier(this.findElement("#host"), "host")
+    this.assert.equal((host as OutletController).betaOutletConnectedCallCountValue, 2)
   }
 
   get controllers() {
