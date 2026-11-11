@@ -45,23 +45,21 @@ export default class ApplicationTests extends ApplicationTestCase {
     this.assert.ok(this.controllers[0] instanceof BController)
   }
 
-  "test finding a controller by its element does not list the contexts of its identifier"() {
+  async "test finding a controller by its element after it disconnects and reconnects"() {
     this.application.load(this.definitions)
-    const module = this.application.router.modules.find((module) => module.identifier == "a")!
-    const contexts = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(module), "contexts")!.get!
-    let contextsReads = 0
-    Object.defineProperty(module, "contexts", {
-      configurable: true,
-      get() {
-        contextsReads++
-        return contexts.call(this)
-      },
-    })
-
     const element = this.findElement(`[data-controller="a"]`)
+    const controller = this.application.getControllerForElementAndIdentifier(element, "a")
+    this.assert.ok(controller instanceof AController)
 
-    this.assert.ok(this.application.getControllerForElementAndIdentifier(element, "a") instanceof AController)
-    this.assert.equal(contextsReads, 0)
+    element.setAttribute("data-controller", "")
+    await this.nextFrame
+    this.assert.equal(this.application.getControllerForElementAndIdentifier(element, "a"), null)
+    this.assert.equal(this.controllers.length, 1)
+
+    element.setAttribute("data-controller", "a")
+    await this.nextFrame
+    this.assert.equal(this.application.getControllerForElementAndIdentifier(element, "a"), controller)
+    this.assert.equal(this.controllers.length, 2)
   }
 
   get controllers() {
