@@ -131,10 +131,12 @@ const reservedPropertyNames = [
 function overriddenReservedPropertyNames(controllerConstructor: ControllerConstructor) {
   const prototypes: object[] = []
 
+  // Stop before the base class, whose prototype extends an Object.prototype,
+  // ours or another realm's, or null.
   for (
-    let prototype = controllerConstructor.prototype;
-    Object.getPrototypeOf(prototype) !== Object.prototype;
-    prototype = Object.getPrototypeOf(prototype)
+    let prototype = controllerConstructor.prototype, parent = Object.getPrototypeOf(prototype);
+    parent && Object.getPrototypeOf(parent);
+    prototype = parent, parent = Object.getPrototypeOf(prototype)
   ) {
     prototypes.push(prototype)
   }

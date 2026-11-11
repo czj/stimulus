@@ -28,6 +28,16 @@ class ForeignController {
   connect() {}
   disconnect() {}
 }
+class ForeignSubclassController extends ForeignController {}
+
+function controllerOnBasePrototype(basePrototype: any) {
+  function Base() {}
+  Base.prototype = basePrototype
+  Object.defineProperty(basePrototype, "scope", { get() {} })
+  return class extends (Base as any) {
+    static shouldLoad = true
+  }
+}
 
 export default class ApplicationTests extends ApplicationTestCase {
   fixtureHTML = `<div data-controller="a"><div data-controller="b">`
@@ -100,7 +110,22 @@ export default class ApplicationTests extends ApplicationTestCase {
   "test Application#register does not report the properties of another copy of Controller"() {
     const warnings = this.captureWarnings()
 
-    this.application.register("foreign", ForeignController as any)
+    this.application.register("foreign", ForeignSubclassController as any)
+
+    this.assert.equal(warnings.length, 0)
+  }
+
+  "test Application#register does not report the base class of a controller from another realm"() {
+    const iframe = document.createElement("iframe")
+    document.body.appendChild(iframe)
+    const warnings = this.captureWarnings()
+
+    try {
+      this.application.register("null", controllerOnBasePrototype(Object.create(null)) as any)
+      this.application.register("realm", controllerOnBasePrototype(new (iframe.contentWindow as any).Object()) as any)
+    } finally {
+      iframe.remove()
+    }
 
     this.assert.equal(warnings.length, 0)
   }
