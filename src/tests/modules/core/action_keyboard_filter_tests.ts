@@ -436,6 +436,20 @@ export default class ActionKeyboardFilterTests extends LogControllerTestCase {
     this.assertNoActions()
   }
 
+  async "test greek letter typed with AltGraph on the M key does not match the m filter"() {
+    const button = this.findElement("#m-and-alt-p-filters")
+    await this.nextFrame
+    await this.triggerKeyboardEvent(button, "keydown", { key: "μ", code: "KeyM", modifierAltGraph: true })
+    this.assertNoActions()
+  }
+
+  async "test a native digit on a letter key does not match a digit filter"() {
+    const button = this.findElement("#digit-1-and-2-filters")
+    await this.nextFrame
+    await this.triggerKeyboardEvent(button, "keydown", { key: "๒", code: "KeyQ" })
+    this.assertNoActions()
+  }
+
   // macOS Option+P types π
   async "test alt+p filter does not match a greek letter typed with Option on the P key"() {
     const button = this.findElement("#m-and-alt-p-filters")

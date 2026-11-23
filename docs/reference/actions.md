@@ -99,6 +99,8 @@ page_down | PageDown
 [a-z]     | [a-z]
 [0-9]     | [0-9]
 
+On non-Latin keyboard layouts (Cyrillic, Greek, Hebrew, Arabic, Thai, Devanagari…), a letter or mark matches the `[a-z]` filter of the key in that position on a US QWERTY keyboard (its [`code`](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code)), so `keydown.k` fires for the "л" key on a Russian layout, and a native digit such as "۲" matches the `[0-9]` filter of its value. Latin layouts, Alt and AltGr combinations, IME input, and keys whose value is already in your `keyMappings` always match on the character typed.
+
 To filter by another key, add a mapping to `keyMappings` in a custom schema.
 
 ```javascript

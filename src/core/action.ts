@@ -113,13 +113,9 @@ export class Action {
 
   private normalizedKeyboardEventKey(event: KeyboardEvent, mappedKey: string): string {
     const eventKey = event.key.toLowerCase()
+    const physicalKey = isPrintableASCIICharacter(mappedKey) ? physicalKeyFor(event) : null
 
-    if (!shouldUseCodeFallback(event, mappedKey)) {
-      return eventKey
-    }
-
-    const keyFromCode = keyboardEventKeyFromCode(event.code)
-    return keyFromCode || eventKey
+    return physicalKey && !isMappedValue(this.keyMappings, eventKey) ? physicalKey : eventKey
   }
 }
 
@@ -152,24 +148,75 @@ function typecast(value: any): any {
   }
 }
 
-function shouldUseCodeFallback(event: KeyboardEvent, mappedKey: string): boolean {
-  return !event.isComposing && isPrintableASCIICharacter(mappedKey) && !isPrintableASCIICharacter(event.key)
+interface KeyPatterns {
+  letterOrMark: RegExp
+  sharedScript: RegExp
+  decimalDigit: RegExp
+}
+
+let keyPatterns: KeyPatterns | null | undefined
+
+// Built lazily at runtime: the es2017 target rejects Unicode property escapes in regex literals, and older engines throw on them
+function getKeyPatterns(): KeyPatterns | null {
+  if (keyPatterns === undefined) {
+    try {
+      keyPatterns = {
+        letterOrMark: new RegExp("^[\\p{L}\\p{M}]$", "u"),
+        sharedScript: new RegExp("^[\\p{Script=Latin}\\p{Script=Common}\\p{Script=Inherited}]$", "u"),
+        decimalDigit: new RegExp("^\\p{Nd}$", "u"),
+      }
+    } catch (o_O) {
+      keyPatterns = null
+    }
+  }
+  return keyPatterns
+}
+
+// A non-Latin layout's letter or mark stands for the US QWERTY key at its position, and a native digit for its value.
+// Latin layouts keep what they type (é, ğ, ı, µ, €), and so do Alt/AltGraph combinations and IME keydowns (keyCode 229 on macOS).
+function physicalKeyFor(event: KeyboardEvent): string | null {
+  const { key } = event
+  const patterns = getKeyPatterns()
+  if (
+    !patterns ||
+    event.isComposing ||
+    event.keyCode === 229 ||
+    event.altKey ||
+    event.getModifierState?.("AltGraph") ||
+    isPrintableASCIICharacter(key)
+  ) {
+    return null
+  }
+
+  if (/^(Digit|Numpad)\d$/.test(event.code) && patterns.decimalDigit.test(key)) {
+    return String(decimalDigitValue(key, patterns.decimalDigit))
+  }
+
+  const letterMatch = event.code.match(/^Key([A-Z])$/)
+  if (letterMatch && patterns.letterOrMark.test(key) && !patterns.sharedScript.test(key)) {
+    return letterMatch[1].toLowerCase()
+  }
+
+  return null
+}
+
+// Unicode encodes decimal digits in contiguous runs of 0 to 9, so a digit's value is its offset in its run, modulo 10
+function decimalDigitValue(digit: string, decimalDigit: RegExp): number {
+  const codePoint = digit.codePointAt(0) || 0
+  let offset = 0
+  while (decimalDigit.test(String.fromCodePoint(codePoint - offset - 1))) {
+    offset++
+  }
+  return offset % 10
+}
+
+function isMappedValue(keyMappings: { [key: string]: string }, key: string): boolean {
+  return Object.keys(keyMappings).some((filter) => {
+    const value = keyMappings[filter]
+    return typeof value == "string" && value.toLowerCase() == key
+  })
 }
 
 function isPrintableASCIICharacter(value: string): boolean {
   return value.length === 1 && value >= " " && value <= "~"
-}
-
-function keyboardEventKeyFromCode(code: string): string | null {
-  const keyMatch = code.match(/^Key([A-Z])$/)
-  if (keyMatch) {
-    return keyMatch[1].toLowerCase()
-  }
-
-  const digitMatch = code.match(/^Digit([0-9])$/)
-  if (digitMatch) {
-    return digitMatch[1]
-  }
-
-  return null
 }
